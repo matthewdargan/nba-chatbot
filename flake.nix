@@ -1,5 +1,9 @@
 {
   inputs = {
+    dream2nix = {
+      inputs.nixpkgs.follows = "nixpkgs";
+      url = "github:nix-community/dream2nix";
+    };
     nixpkgs.url = "nixpkgs/nixos-unstable";
     parts.url = "github:hercules-ci/flake-parts";
     pre-commit-hooks = {
@@ -15,12 +19,23 @@
         pkgs,
         ...
       }: let
-        python = pkgs.python3.withPackages (ps: with ps; [langchain langchain-community]);
+        package = inputs.dream2nix.lib.evalModules {
+          packageSets.nixpkgs = pkgs;
+          modules = [
+            ./default.nix
+            {
+              paths.package = ./.;
+              paths.projectRoot = ./.;
+            }
+          ];
+        };
       in {
         devShells.default = pkgs.mkShell {
-          packages = [pkgs.ollama python];
+          inputsFrom = [package.devShell];
+          packages = [pkgs.ollama];
           shellHook = "${config.pre-commit.installationScript}";
         };
+        packages.nba-chatbot = package;
         pre-commit = {
           settings = {
             hooks = {
