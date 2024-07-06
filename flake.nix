@@ -1,8 +1,8 @@
 {
   inputs = {
-    dream2nix = {
+    nix-go = {
       inputs.nixpkgs.follows = "nixpkgs";
-      url = "github:nix-community/dream2nix";
+      url = "github:matthewdargan/nix-go";
     };
     nixpkgs.url = "nixpkgs/nixos-unstable";
     parts.url = "github:hercules-ci/flake-parts";
@@ -16,32 +16,40 @@
       imports = [inputs.pre-commit-hooks.flakeModule];
       perSystem = {
         config,
+        inputs',
+        lib,
         pkgs,
         ...
-      }: let
-        package = inputs.dream2nix.lib.evalModules {
-          packageSets.nixpkgs = pkgs;
-          modules = [
-            ./default.nix
-            {
-              paths.package = ./.;
-              paths.projectRoot = ./.;
-            }
-          ];
-        };
-      in {
+      }: {
         devShells.default = pkgs.mkShell {
-          inputsFrom = [package.devShell];
-          packages = [pkgs.ollama];
+          packages = [inputs'.nix-go.packages.go inputs'.nix-go.packages.golangci-lint pkgs.ollama];
           shellHook = "${config.pre-commit.installationScript}";
         };
-        packages.nba-chatbot = package;
+        packages.nba-chatbot = inputs'.nix-go.legacyPackages.buildGoModule {
+          meta = with lib; {
+            description = "NBA RAG Chatbot";
+            homepage = "https://github.com/matthewdargan/nba-chatbot";
+            license = licenses.bsd3;
+            maintainers = with maintainers; [matthewdargan];
+          };
+          pname = "nba-chatbot";
+          src = ./.;
+          vendorHash = "sha256-V/TkyevZF3mkpgsg9WU9ZktM5Al1wixrrd7uirZEbrE=";
+          version = "0.1.0";
+        };
         pre-commit = {
           settings = {
             hooks = {
               alejandra.enable = true;
               deadnix.enable = true;
-              ruff.enable = true;
+              golangci-lint = {
+                enable = true;
+                package = inputs'.nix-go.packages.golangci-lint;
+              };
+              gotest = {
+                enable = true;
+                package = inputs'.nix-go.packages.go;
+              };
               statix.enable = true;
             };
             src = ./.;
