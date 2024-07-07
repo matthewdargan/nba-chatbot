@@ -27,7 +27,7 @@ type metadata struct {
 	Row    int    `json:"row"`
 }
 
-const model = "llama2:7b"
+const model = "llama3:8b"
 
 func main() {
 	name := "stats/player-per-game.csv"
