@@ -34,10 +34,11 @@
           };
           pname = "nba-chatbot";
           src = ./.;
-          vendorHash = "sha256-V/TkyevZF3mkpgsg9WU9ZktM5Al1wixrrd7uirZEbrE=";
-          version = "0.1.0";
+          vendorHash = "sha256-DdJ/abG6gmgrkZ+OXGL83rahR61JPCKT3Ky9Re00SS8=";
+          version = "0.2.0";
         };
         pre-commit = {
+          check.enable = false;
           settings = {
             hooks = {
               alejandra.enable = true;

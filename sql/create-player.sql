@@ -1,0 +1,7 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE TABLE player (
+    id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    embedding vector(4096),
+    source TEXT NOT NULL,
+    row_number INT NOT NULL
+);
