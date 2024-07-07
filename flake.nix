@@ -22,7 +22,7 @@
         ...
       }: {
         devShells.default = pkgs.mkShell {
-          packages = [inputs'.nix-go.packages.go inputs'.nix-go.packages.golangci-lint pkgs.ollama];
+          packages = [inputs'.nix-go.packages.go inputs'.nix-go.packages.golangci-lint];
           shellHook = "${config.pre-commit.installationScript}";
         };
         packages.nba-chatbot = inputs'.nix-go.legacyPackages.buildGoModule {
