@@ -1,5 +1,9 @@
-// Package player provides facilities for vectorizing backetball player data.
-package player
+// Copyright 2024 Matthew P. Dargan. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// Package nba provides facilities for vectorizing NBA data.
+package nba
 
 import (
 	"context"
@@ -9,13 +13,14 @@ import (
 	"strconv"
 
 	"github.com/lib/pq"
+	"github.com/matthewdargan/nba-chatbot/internal/token"
 	ollama "github.com/ollama/ollama/api"
 	"github.com/pgvector/pgvector-go"
 )
 
-// A Player represents a backetball player.
+// A Player represents an NBA player.
 type Player struct {
-	Input              Input
+	Input              EmbeddingInput
 	Embedding          pgvector.Vector `pg:"type:vector(4096)"`
 	rank               int
 	name               string
@@ -49,22 +54,27 @@ type Player struct {
 	points             float64
 }
 
-// An Input represents a player's input data.
-type Input struct {
+// An EmbeddingInput represents the input to an embedding model.
+type EmbeddingInput struct {
 	Tokens string `json:"tokens"`
 }
 
-const rowLen = 30
+const rLen = 30
 
-// New returns a new [Player] from a CSV row.
-func New(r []string) (Player, error) {
-	if len(r) != rowLen {
-		return Player{}, fmt.Errorf("expected row of length %d, got %d", rowLen, len(r))
+// NewPlayer returns a new [Player] from the given fields and row.
+func NewPlayer(fields, row []string) (Player, error) {
+	if len(row) != rLen {
+		return Player{}, fmt.Errorf("expected row of length %d, got %d", rLen, len(row))
+	}
+	tokens, err := token.New(fields, row)
+	if err != nil {
+		return Player{}, err
 	}
 	p := Player{
-		name:     r[1],
-		position: r[2],
-		team:     r[4],
+		Input:    EmbeddingInput{Tokens: tokens},
+		name:     row[1],
+		position: row[2],
+		team:     row[4],
 	}
 	ints := map[int]*int{
 		0: &p.rank,
@@ -100,28 +110,28 @@ func New(r []string) (Player, error) {
 		20: &p.freeThrowPct,
 	}
 	for i, ptr := range ints {
-		v, err := strconv.Atoi(r[i])
+		v, err := strconv.Atoi(row[i])
 		if err != nil {
-			fmt.Printf("r: %v\n", r)
+			fmt.Printf("r: %v\n", row)
 			return Player{}, fmt.Errorf("failed to parse integer at index %d: %v", i, err)
 		}
 		*ptr = v
 	}
 	for i, ptr := range floats {
-		v, err := strconv.ParseFloat(r[i], 64)
+		v, err := strconv.ParseFloat(row[i], 64)
 		if err != nil {
-			fmt.Printf("r: %v\n", r)
+			fmt.Printf("r: %v\n", row)
 			return Player{}, fmt.Errorf("failed to parse float at index %d: %v", i, err)
 		}
 		*ptr = v
 	}
 	for i, ptr := range optionalFloats {
-		if r[i] == "" {
+		if row[i] == "" {
 			continue
 		}
-		v, err := strconv.ParseFloat(r[i], 64)
+		v, err := strconv.ParseFloat(row[i], 64)
 		if err != nil {
-			fmt.Printf("r: %v\n", r)
+			fmt.Printf("r: %v\n", row)
 			return Player{}, fmt.Errorf("failed to parse optional float at index %d: %v", i, err)
 		}
 		*ptr = &v
@@ -129,8 +139,8 @@ func New(r []string) (Player, error) {
 	return p, nil
 }
 
-// Embeddings fetches embeddings for a player from an Ollama model.
-func (p *Player) Embeddings(c *ollama.Client, model string) error {
+// GenerateEmbeddings generates player embeddings.
+func (p *Player) GenerateEmbeddings(c *ollama.Client, model string) error {
 	js, err := json.Marshal(p.Input)
 	if err != nil {
 		return err
