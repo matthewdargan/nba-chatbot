@@ -168,26 +168,26 @@ func InsertPlayers(db *sql.DB, ps []Player) error {
 		return err
 	}
 	stmt, err := txn.Prepare(pq.CopyIn(
-		"player_per_game", "rank", "name", "position", "age", "team", "games",
-		"games_started", "minutes_played", "field_goals", "field_goal_attempts",
+		"player_per_game", "embedding", "rank", "name", "position", "age", "team",
+		"games", "games_started", "minutes_played", "field_goals", "field_goal_attempts",
 		"field_goal_pct", "three_pointers", "three_point_attempts", "three_point_pct",
 		"two_pointers", "two_point_attempts", "two_point_pct", "effective_fg_pct",
 		"free_throws", "free_throw_attempts", "free_throw_pct", "offensive_rebounds",
 		"defensive_rebounds", "total_rebounds", "assists", "steals", "blocks",
-		"turnovers", "personal_fouls", "points", "embedding",
+		"turnovers", "personal_fouls", "points",
 	))
 	if err != nil {
 		return err
 	}
 	for _, p := range ps {
 		_, err = stmt.Exec(
-			p.rank, p.name, p.position, p.age, p.team, p.games, p.gamesStarted,
+			p.Embedding, p.rank, p.name, p.position, p.age, p.team, p.games, p.gamesStarted,
 			p.minutesPlayed, p.fieldGoals, p.fieldGoalAttempts, p.fieldGoalPct,
 			p.threePointers, p.threePointAttempts, p.threePointPct, p.twoPointers,
 			p.twoPointAttempts, p.twoPointPct, p.effectiveFGPct, p.freeThrows,
 			p.freeThrowAttempts, p.freeThrowPct, p.offensiveRebounds, p.defensiveRebounds,
 			p.totalRebounds, p.assists, p.steals, p.blocks, p.turnovers,
-			p.personalFouls, p.points, p.Embedding,
+			p.personalFouls, p.points,
 		)
 		if err != nil {
 			return err
