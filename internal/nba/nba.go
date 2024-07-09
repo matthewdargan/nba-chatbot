@@ -112,7 +112,6 @@ func NewPlayer(fields, row []string) (Player, error) {
 	for i, ptr := range ints {
 		v, err := strconv.Atoi(row[i])
 		if err != nil {
-			fmt.Printf("r: %v\n", row)
 			return Player{}, fmt.Errorf("failed to parse integer at index %d: %v", i, err)
 		}
 		*ptr = v
@@ -120,7 +119,6 @@ func NewPlayer(fields, row []string) (Player, error) {
 	for i, ptr := range floats {
 		v, err := strconv.ParseFloat(row[i], 64)
 		if err != nil {
-			fmt.Printf("r: %v\n", row)
 			return Player{}, fmt.Errorf("failed to parse float at index %d: %v", i, err)
 		}
 		*ptr = v
@@ -131,7 +129,6 @@ func NewPlayer(fields, row []string) (Player, error) {
 		}
 		v, err := strconv.ParseFloat(row[i], 64)
 		if err != nil {
-			fmt.Printf("r: %v\n", row)
 			return Player{}, fmt.Errorf("failed to parse optional float at index %d: %v", i, err)
 		}
 		*ptr = &v
