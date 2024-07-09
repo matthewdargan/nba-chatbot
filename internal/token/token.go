@@ -13,6 +13,9 @@ import (
 
 // New returns tokens for the given fields and row.
 func New(fields, row []string) (string, error) {
+	if len(fields) == 0 {
+		return "", errors.New("empty fields")
+	}
 	if len(fields) != len(row) {
 		return "", errors.New("fields and row must have the same length")
 	}
