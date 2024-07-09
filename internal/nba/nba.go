@@ -66,15 +66,15 @@ func NewPlayer(fields, row []string) (Player, error) {
 	if len(row) != rLen {
 		return Player{}, fmt.Errorf("expected row of length %d, got %d", rLen, len(row))
 	}
-	tokens, err := token.New(fields, row)
-	if err != nil {
-		return Player{}, err
-	}
 	p := Player{
-		Input:    EmbeddingInput{Tokens: tokens},
 		name:     row[1],
 		position: row[2],
 		team:     row[4],
+	}
+	var err error
+	p.Input.Tokens, err = token.New(fields, row)
+	if err != nil {
+		return Player{}, err
 	}
 	ints := map[int]*int{
 		0: &p.rank,
@@ -110,24 +110,23 @@ func NewPlayer(fields, row []string) (Player, error) {
 		20: &p.freeThrowPct,
 	}
 	for i, ptr := range ints {
-		v, err := strconv.Atoi(row[i])
+		*ptr, err = strconv.Atoi(row[i])
 		if err != nil {
 			return Player{}, fmt.Errorf("failed to parse integer at index %d: %v", i, err)
 		}
-		*ptr = v
 	}
 	for i, ptr := range floats {
-		v, err := strconv.ParseFloat(row[i], 64)
+		*ptr, err = strconv.ParseFloat(row[i], 64)
 		if err != nil {
 			return Player{}, fmt.Errorf("failed to parse float at index %d: %v", i, err)
 		}
-		*ptr = v
 	}
 	for i, ptr := range optionalFloats {
 		if row[i] == "" {
 			continue
 		}
-		v, err := strconv.ParseFloat(row[i], 64)
+		var v float64
+		v, err = strconv.ParseFloat(row[i], 64)
 		if err != nil {
 			return Player{}, fmt.Errorf("failed to parse optional float at index %d: %v", i, err)
 		}
