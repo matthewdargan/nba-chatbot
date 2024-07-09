@@ -8,19 +8,18 @@ package nba
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strconv"
 
 	"github.com/lib/pq"
 	"github.com/matthewdargan/nba-chatbot/internal/token"
-	ollama "github.com/ollama/ollama/api"
+	"github.com/ollama/ollama/api"
 	"github.com/pgvector/pgvector-go"
 )
 
 // A Player represents an NBA player.
 type Player struct {
-	Input              EmbeddingInput
+	tokens             string
 	Embedding          pgvector.Vector `pg:"type:vector(4096)"`
 	rank               int
 	name               string
@@ -54,11 +53,6 @@ type Player struct {
 	points             float64
 }
 
-// An EmbeddingInput represents the input to an embedding model.
-type EmbeddingInput struct {
-	Tokens string `json:"tokens"`
-}
-
 const rLen = 30
 
 // NewPlayer returns a new [Player] from the given fields and row.
@@ -72,7 +66,7 @@ func NewPlayer(fields, row []string) (Player, error) {
 		team:     row[4],
 	}
 	var err error
-	p.Input.Tokens, err = token.New(fields, row)
+	p.tokens, err = token.New(fields, row)
 	if err != nil {
 		return Player{}, err
 	}
@@ -136,14 +130,10 @@ func NewPlayer(fields, row []string) (Player, error) {
 }
 
 // GenerateEmbeddings generates player embeddings.
-func (p *Player) GenerateEmbeddings(c *ollama.Client, model string) error {
-	js, err := json.Marshal(p.Input)
-	if err != nil {
-		return err
-	}
-	req := &ollama.EmbeddingRequest{
+func (p *Player) GenerateEmbeddings(c *api.Client, model string) error {
+	req := &api.EmbeddingRequest{
 		Model:  model,
-		Prompt: string(js),
+		Prompt: p.tokens,
 	}
 	resp, err := c.Embeddings(context.Background(), req)
 	if err != nil {
@@ -176,7 +166,7 @@ func InsertPlayers(db *sql.DB, ps []Player) error {
 		return err
 	}
 	for _, p := range ps {
-		_, err = stmt.Exec(
+		if _, err = stmt.Exec(
 			p.Embedding, p.rank, p.name, p.position, p.age, p.team, p.games, p.gamesStarted,
 			p.minutesPlayed, p.fieldGoals, p.fieldGoalAttempts, p.fieldGoalPct,
 			p.threePointers, p.threePointAttempts, p.threePointPct, p.twoPointers,
@@ -184,8 +174,7 @@ func InsertPlayers(db *sql.DB, ps []Player) error {
 			p.freeThrowAttempts, p.freeThrowPct, p.offensiveRebounds, p.defensiveRebounds,
 			p.totalRebounds, p.assists, p.steals, p.blocks, p.turnovers,
 			p.personalFouls, p.points,
-		)
-		if err != nil {
+		); err != nil {
 			return err
 		}
 	}

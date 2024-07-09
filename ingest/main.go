@@ -12,7 +12,7 @@ import (
 	"os"
 
 	"github.com/matthewdargan/nba-chatbot/internal/nba"
-	ollama "github.com/ollama/ollama/api"
+	"github.com/ollama/ollama/api"
 )
 
 const model = "llama3:8b"
@@ -37,7 +37,7 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	client, err := ollama.ClientFromEnvironment()
+	client, err := api.ClientFromEnvironment()
 	if err != nil {
 		log.Fatal(err)
 	}
