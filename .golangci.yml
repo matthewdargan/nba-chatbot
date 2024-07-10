@@ -12,6 +12,7 @@ linters-settings:
   errcheck:
     exclude-functions:
       - (*database/sql.DB).Close
+      - (*database/sql.Rows).Close
       - (*os.File).Close
   govet:
     disable:

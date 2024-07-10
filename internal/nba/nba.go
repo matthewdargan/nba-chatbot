@@ -186,3 +186,42 @@ func InsertPlayers(db *sql.DB, ps []Player) error {
 	}
 	return txn.Commit()
 }
+
+const playerByNameQuery = `
+    SELECT
+        embedding, rank, name, position, age, team, games, games_started,
+        minutes_played, field_goals, field_goal_attempts, field_goal_pct,
+        three_pointers, three_point_attempts, three_point_pct, two_pointers,
+        two_point_attempts, two_point_pct, effective_fg_pct, free_throws,
+        free_throw_attempts, free_throw_pct, offensive_rebounds, defensive_rebounds,
+        total_rebounds, assists, steals, blocks, turnovers, personal_fouls, points
+    FROM player_per_game
+    WHERE name = $1
+`
+
+// PlayerByName retrieves player data by name. Multiple entries may be returned
+// if the player was traded mid-season.
+func PlayerByName(db *sql.DB, name string) ([]Player, error) {
+	rows, err := db.Query(playerByNameQuery, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ps []Player
+	for rows.Next() {
+		var p Player
+		if err := rows.Scan(
+			&p.Embedding, &p.rank, &p.name, &p.position, &p.age, &p.team, &p.games, &p.gamesStarted,
+			&p.minutesPlayed, &p.fieldGoals, &p.fieldGoalAttempts, &p.fieldGoalPct,
+			&p.threePointers, &p.threePointAttempts, &p.threePointPct, &p.twoPointers,
+			&p.twoPointAttempts, &p.twoPointPct, &p.effectiveFGPct, &p.freeThrows,
+			&p.freeThrowAttempts, &p.freeThrowPct, &p.offensiveRebounds, &p.defensiveRebounds,
+			&p.totalRebounds, &p.assists, &p.steals, &p.blocks, &p.turnovers,
+			&p.personalFouls, &p.points,
+		); err != nil {
+			return nil, err
+		}
+		ps = append(ps, p)
+	}
+	return ps, nil
+}
