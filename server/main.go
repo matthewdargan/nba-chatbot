@@ -9,24 +9,20 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	_ "github.com/lib/pq"
 	"github.com/matthewdargan/nba-chatbot/internal/nba"
 	"github.com/ollama/ollama/api"
-	"github.com/pgvector/pgvector-go"
 )
 
 type playerPerGameRequest struct {
 	Question   string `json:"question"`
 	PlayerName string `json:"player_name"`
-}
-
-type prompt struct {
-	Question   string            `json:"question"`
-	Embeddings []pgvector.Vector `json:"embeddings"`
 }
 
 const model = "llama3:8b"
@@ -61,19 +57,12 @@ func main() {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		// TODO: put in nba package?
-		pt := prompt{Question: req.Question}
+		var es []string
 		for _, p := range player {
-			pt.Embeddings = append(pt.Embeddings, p.Embedding)
+			es = append(es, p.Embedding.String())
 		}
-		js, err := json.Marshal(pt)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		genReq := &api.GenerateRequest{
-			Model:  model,
-			Prompt: string(js),
-		}
-		log.Printf("genReq: %+v", genReq)
+		prompt := fmt.Sprintf("Using this data as embeddings: %s. Respond to this prompt: %s", strings.Join(es, ", "), req.Question)
+		genReq := &api.GenerateRequest{Model: model, Prompt: prompt}
 		var bs []byte
 		if err := client.Generate(context.Background(), genReq, func(r api.GenerateResponse) error {
 			bs = append(bs, r.Response...)
