@@ -20,7 +20,7 @@ import (
 // A Player represents an NBA player.
 type Player struct {
 	tokens             string
-	Embedding          pgvector.Vector `pg:"type:vector(4096)"`
+	Embedding          pgvector.Vector `pg:"type:vector(1024)"`
 	rank               int
 	name               string
 	position           string

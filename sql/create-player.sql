@@ -1,7 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE player_per_game (
     id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    embedding vector(4096) NOT NULL,
+    embedding vector(1024) NOT NULL,
     rank INTEGER NOT NULL,
     name TEXT NOT NULL,
     position TEXT NOT NULL,

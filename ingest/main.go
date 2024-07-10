@@ -15,7 +15,7 @@ import (
 	"github.com/ollama/ollama/api"
 )
 
-const model = "llama3:8b"
+const model = "mxbai-embed-large"
 
 func main() {
 	name := "stats/player-per-game.csv"
