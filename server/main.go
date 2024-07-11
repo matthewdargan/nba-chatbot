@@ -23,9 +23,15 @@ type playerPerGameRequest struct {
 	Question string `json:"question"`
 }
 
-const model = "llama3:8b"
+type playerPerGameResponse struct {
+	Response string `json:"response"`
+}
 
 func main() {
+	client, err := api.ClientFromEnvironment()
+	if err != nil {
+		log.Fatal(err)
+	}
 	db, err := sql.Open("postgres", os.Getenv("DB_URL"))
 	if err != nil {
 		log.Fatal(err)
@@ -38,36 +44,36 @@ func main() {
 		}
 		var req playerPerGameRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 		if req.Question == "" {
-			http.Error(w, "missing question", http.StatusBadRequest)
+			http.Error(w, "Missing question", http.StatusBadRequest)
 			return
 		}
-		client, err := api.ClientFromEnvironment()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		// TODO: put in nba package?
 		p, err := nba.NearestPlayer(client, db, req.Question)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, "Error finding nearest player", http.StatusInternalServerError)
 		}
 		prompt := fmt.Sprintf("Using these Player Per Game statistics: %s. Respond to this prompt: %s", p, req.Question)
-		fmt.Println(prompt)
-		genReq := &api.GenerateRequest{Model: model, Prompt: prompt}
-		var bs []byte
+		log.Println(prompt)
+		stream := false
+		genReq := &api.GenerateRequest{
+			Model:  "llama3:8b",
+			Prompt: prompt,
+			Stream: &stream,
+		}
+		var resp playerPerGameResponse
 		if err := client.Generate(context.Background(), genReq, func(r api.GenerateResponse) error {
-			bs = append(bs, r.Response...)
+			resp.Response = r.Response
 			return nil
 		}); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		bs = append(bs, '\n')
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write(bs); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			http.Error(w, "Invalid response body", http.StatusInternalServerError)
 		}
 	})
 	log.Fatal(http.ListenAndServe(":8080", nil))

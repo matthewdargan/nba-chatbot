@@ -13,6 +13,7 @@ linters-settings:
     exclude-functions:
       - (*database/sql.DB).Close
       - (*database/sql.Rows).Close
+      - (net/http.ResponseWriter).Write
       - (*os.File).Close
   govet:
     disable:
