@@ -15,8 +15,6 @@ import (
 	"github.com/ollama/ollama/api"
 )
 
-const model = "mxbai-embed-large"
-
 func main() {
 	name := "stats/player-per-game.csv"
 	f, err := os.Open(name)
@@ -47,7 +45,7 @@ func main() {
 	}
 	defer db.Close()
 	for i := range ps {
-		if err = ps[i].GenerateEmbeddings(client, model); err != nil {
+		if err = ps[i].GenerateEmbeddings(client); err != nil {
 			log.Fatalf("failed to generate embeddings: %v", err)
 		}
 	}

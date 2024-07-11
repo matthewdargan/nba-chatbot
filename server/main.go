@@ -13,7 +13,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 
 	_ "github.com/lib/pq"
 	"github.com/matthewdargan/nba-chatbot/internal/nba"
@@ -21,8 +20,7 @@ import (
 )
 
 type playerPerGameRequest struct {
-	Question   string `json:"question"`
-	PlayerName string `json:"player_name"`
+	Question string `json:"question"`
 }
 
 const model = "llama3:8b"
@@ -43,13 +41,8 @@ func main() {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if req.Question == "" || req.PlayerName == "" {
-			http.Error(w, "missing question or player_name", http.StatusBadRequest)
-			return
-		}
-		player, err := nba.PlayerByName(db, req.PlayerName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if req.Question == "" {
+			http.Error(w, "missing question", http.StatusBadRequest)
 			return
 		}
 		client, err := api.ClientFromEnvironment()
@@ -57,11 +50,12 @@ func main() {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		// TODO: put in nba package?
-		var es []string
-		for _, p := range player {
-			es = append(es, p.Embedding.String())
+		p, err := nba.NearestPlayer(client, db, req.Question)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		prompt := fmt.Sprintf("Using this data as embeddings: %s. Respond to this prompt: %s", strings.Join(es, ", "), req.Question)
+		prompt := fmt.Sprintf("Using these Player Per Game statistics: %s. Respond to this prompt: %s", p, req.Question)
+		fmt.Println(prompt)
 		genReq := &api.GenerateRequest{Model: model, Prompt: prompt}
 		var bs []byte
 		if err := client.Generate(context.Background(), genReq, func(r api.GenerateResponse) error {

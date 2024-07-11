@@ -53,10 +53,38 @@ type Player struct {
 	points             float64
 }
 
-const rLen = 30
+func (p Player) String() string {
+	return fmt.Sprintf(
+		`"Name": %s, "Position": %s, "Age": %d, "Team": %s, "Games": %d, `+
+			`"Games Started": %d, "Minutes Played": %.2f, "Field Goals": %.2f, `+
+			`"Field Goal Attempts": %.2f, "Field Goal %%": %s, "3-Pointers": %.2f, `+
+			`"3-Point Attempts": %.2f, "3-Point %%": %s, "2-Pointers": %.2f, `+
+			`"2-Point Attempts": %.2f, "2-Point %%": %s, "Effective FG %%": %s, `+
+			`"Free Throws": %.2f, "Free Throw Attempts": %.2f, "Free Throw %%": %s, `+
+			`"Offensive Rebounds": %.2f, "Defensive Rebounds": %.2f, "Total Rebounds": %.2f, `+
+			`"Assists": %.2f, "Steals": %.2f, "Blocks": %.2f, "Turnovers": %.2f, `+
+			`"Personal Fouls": %.2f, "Points": %.2f`,
+		p.name, p.position, p.age, p.team, p.games, p.gamesStarted, p.minutesPlayed,
+		p.fieldGoals, p.fieldGoalAttempts, formatPercentage(p.fieldGoalPct),
+		p.threePointers, p.threePointAttempts, formatPercentage(p.threePointPct),
+		p.twoPointers, p.twoPointAttempts, formatPercentage(p.twoPointPct),
+		formatPercentage(p.effectiveFGPct), p.freeThrows, p.freeThrowAttempts,
+		formatPercentage(p.freeThrowPct), p.offensiveRebounds, p.defensiveRebounds,
+		p.totalRebounds, p.assists, p.steals, p.blocks, p.turnovers, p.personalFouls,
+		p.points,
+	)
+}
+
+func formatPercentage(p *float64) string {
+	if p == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf("%.2f%%", *p*100)
+}
 
 // NewPlayer returns a new [Player] from the given fields and row.
 func NewPlayer(fields, row []string) (Player, error) {
+	const rLen = 30
 	if len(row) != rLen {
 		return Player{}, fmt.Errorf("expected row of length %d, got %d", rLen, len(row))
 	}
@@ -129,21 +157,20 @@ func NewPlayer(fields, row []string) (Player, error) {
 	return p, nil
 }
 
+const embeddingModel = "mxbai-embed-large"
+
 // GenerateEmbeddings generates player embeddings.
-func (p *Player) GenerateEmbeddings(c *api.Client, model string) error {
-	req := &api.EmbeddingRequest{
-		Model:  model,
-		Prompt: p.tokens,
-	}
+func (p *Player) GenerateEmbeddings(c *api.Client) error {
+	req := &api.EmbeddingRequest{Model: embeddingModel, Prompt: p.tokens}
 	resp, err := c.Embeddings(context.Background(), req)
 	if err != nil {
 		return err
 	}
-	embed := make([]float32, len(resp.Embedding))
+	eb := make([]float32, len(resp.Embedding))
 	for i, v := range resp.Embedding {
-		embed[i] = float32(v)
+		eb[i] = float32(v)
 	}
-	p.Embedding = pgvector.NewVector(embed)
+	p.Embedding = pgvector.NewVector(eb)
 	return nil
 }
 
@@ -187,41 +214,41 @@ func InsertPlayers(db *sql.DB, ps []Player) error {
 	return txn.Commit()
 }
 
-const playerByNameQuery = `
-    SELECT
-        embedding, rank, name, position, age, team, games, games_started,
-        minutes_played, field_goals, field_goal_attempts, field_goal_pct,
-        three_pointers, three_point_attempts, three_point_pct, two_pointers,
-        two_point_attempts, two_point_pct, effective_fg_pct, free_throws,
-        free_throw_attempts, free_throw_pct, offensive_rebounds, defensive_rebounds,
-        total_rebounds, assists, steals, blocks, turnovers, personal_fouls, points
-    FROM player_per_game
-    WHERE name = $1
-`
-
-// PlayerByName retrieves player data by name. Multiple entries may be returned
-// if the player was traded mid-season.
-func PlayerByName(db *sql.DB, name string) ([]Player, error) {
-	rows, err := db.Query(playerByNameQuery, name)
+// NearestPlayer returns the player whose embedding is closest to the given question.
+func NearestPlayer(c *api.Client, db *sql.DB, question string) (Player, error) {
+	req := &api.EmbeddingRequest{Model: embeddingModel, Prompt: question}
+	resp, err := c.Embeddings(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return Player{}, err
 	}
-	defer rows.Close()
-	var ps []Player
-	for rows.Next() {
-		var p Player
-		if err := rows.Scan(
-			&p.Embedding, &p.rank, &p.name, &p.position, &p.age, &p.team, &p.games, &p.gamesStarted,
-			&p.minutesPlayed, &p.fieldGoals, &p.fieldGoalAttempts, &p.fieldGoalPct,
-			&p.threePointers, &p.threePointAttempts, &p.threePointPct, &p.twoPointers,
-			&p.twoPointAttempts, &p.twoPointPct, &p.effectiveFGPct, &p.freeThrows,
-			&p.freeThrowAttempts, &p.freeThrowPct, &p.offensiveRebounds, &p.defensiveRebounds,
-			&p.totalRebounds, &p.assists, &p.steals, &p.blocks, &p.turnovers,
-			&p.personalFouls, &p.points,
-		); err != nil {
-			return nil, err
-		}
-		ps = append(ps, p)
+	eb := make([]float32, len(resp.Embedding))
+	for i, v := range resp.Embedding {
+		eb[i] = float32(v)
 	}
-	return ps, nil
+	e := pgvector.NewVector(eb)
+	var p Player
+	const q = `
+        SELECT
+            rank, name, position, age, team, games, games_started, minutes_played,
+            field_goals, field_goal_attempts, field_goal_pct, three_pointers,
+            three_point_attempts, three_point_pct, two_pointers, two_point_attempts,
+            two_point_pct, effective_fg_pct, free_throws, free_throw_attempts,
+            free_throw_pct, offensive_rebounds, defensive_rebounds, total_rebounds,
+            assists, steals, blocks, turnovers, personal_fouls, points
+        FROM player_per_game
+        ORDER BY embedding <-> $1
+        LIMIT 1
+    `
+	if err := db.QueryRow(q, e).Scan(
+		&p.rank, &p.name, &p.position, &p.age, &p.team, &p.games, &p.gamesStarted,
+		&p.minutesPlayed, &p.fieldGoals, &p.fieldGoalAttempts, &p.fieldGoalPct,
+		&p.threePointers, &p.threePointAttempts, &p.threePointPct, &p.twoPointers,
+		&p.twoPointAttempts, &p.twoPointPct, &p.effectiveFGPct, &p.freeThrows,
+		&p.freeThrowAttempts, &p.freeThrowPct, &p.offensiveRebounds, &p.defensiveRebounds,
+		&p.totalRebounds, &p.assists, &p.steals, &p.blocks, &p.turnovers,
+		&p.personalFouls, &p.points,
+	); err != nil {
+		return Player{}, err
+	}
+	return p, nil
 }
