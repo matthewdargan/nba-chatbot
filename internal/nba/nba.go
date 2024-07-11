@@ -8,11 +8,12 @@ package nba
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/lib/pq"
-	"github.com/matthewdargan/nba-chatbot/internal/token"
 	"github.com/ollama/ollama/api"
 	"github.com/pgvector/pgvector-go"
 )
@@ -94,7 +95,7 @@ func NewPlayer(fields, row []string) (Player, error) {
 		team:     row[4],
 	}
 	var err error
-	p.tokens, err = token.New(fields, row)
+	p.tokens, err = tokens(fields, row)
 	if err != nil {
 		return Player{}, err
 	}
@@ -155,6 +156,20 @@ func NewPlayer(fields, row []string) (Player, error) {
 		*ptr = &v
 	}
 	return p, nil
+}
+
+func tokens(fields, row []string) (string, error) {
+	if len(fields) == 0 {
+		return "", errors.New("empty fields")
+	}
+	if len(fields) != len(row) {
+		return "", errors.New("fields and row must have the same length")
+	}
+	ts := make([]string, len(fields))
+	for i, f := range fields {
+		ts[i] = fmt.Sprintf("%q: %s", f, row[i])
+	}
+	return strings.Join(ts, "\n"), nil
 }
 
 const embeddingModel = "mxbai-embed-large"
@@ -225,7 +240,6 @@ func NearestPlayer(c *api.Client, db *sql.DB, question string) (Player, error) {
 	for i, v := range resp.Embedding {
 		eb[i] = float32(v)
 	}
-	e := pgvector.NewVector(eb)
 	var p Player
 	const q = `
         SELECT
@@ -239,7 +253,7 @@ func NearestPlayer(c *api.Client, db *sql.DB, question string) (Player, error) {
         ORDER BY embedding <-> $1
         LIMIT 1
     `
-	if err := db.QueryRow(q, e).Scan(
+	if err := db.QueryRow(q, pgvector.NewVector(eb)).Scan(
 		&p.rank, &p.name, &p.position, &p.age, &p.team, &p.games, &p.gamesStarted,
 		&p.minutesPlayed, &p.fieldGoals, &p.fieldGoalAttempts, &p.fieldGoalPct,
 		&p.threePointers, &p.threePointAttempts, &p.threePointPct, &p.twoPointers,

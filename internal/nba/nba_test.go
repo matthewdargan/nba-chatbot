@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package token
+package nba
 
 import "testing"
 
-func TestNew(t *testing.T) {
+func TestTokens(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
@@ -35,13 +35,13 @@ func TestNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ts, err := New(tt.fields, tt.row)
+			ts, err := tokens(tt.fields, tt.row)
 			t.Logf("ts: %v, err: %v", ts, err)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("New(%v, %v) error = %v", tt.fields, tt.row, err)
+				t.Errorf("tokens(%v, %v) error = %v", tt.fields, tt.row, err)
 			}
 			if !tt.wantErr && ts != tt.want {
-				t.Errorf("New(%v, %v) = %v, want %v", tt.fields, tt.row, ts, tt.want)
+				t.Errorf("tokens(%v, %v) = %v, want %v", tt.fields, tt.row, ts, tt.want)
 			}
 		})
 	}
