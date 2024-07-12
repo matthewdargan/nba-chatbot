@@ -10,10 +10,15 @@
       inputs.nixpkgs.follows = "nixpkgs";
       url = "github:cachix/pre-commit-hooks.nix";
     };
+    process-compose.url = "github:Platonic-Systems/process-compose-flake";
+    services-flake.url = "github:juspay/services-flake";
   };
   outputs = inputs:
     inputs.parts.lib.mkFlake {inherit inputs;} {
-      imports = [inputs.pre-commit-hooks.flakeModule];
+      imports = [
+        inputs.pre-commit-hooks.flakeModule
+        inputs.process-compose.flakeModule
+      ];
       perSystem = {
         config,
         inputs',
@@ -22,7 +27,11 @@
         ...
       }: {
         devShells.default = pkgs.mkShell {
-          packages = [inputs'.nix-go.packages.go inputs'.nix-go.packages.golangci-lint];
+          packages = [
+            inputs'.nix-go.packages.go
+            inputs'.nix-go.packages.golangci-lint
+            pkgs.pgcli
+          ];
           shellHook = "${config.pre-commit.installationScript}";
         };
         packages.nba-chatbot = inputs'.nix-go.legacyPackages.buildGoModule {
@@ -54,6 +63,19 @@
               statix.enable = true;
             };
             src = ./.;
+          };
+        };
+        process-compose."services" = {
+          imports = [inputs.services-flake.processComposeModules.default];
+          services.postgres."pg1" = {
+            enable = true;
+            initialDatabases = [
+              {
+                name = "chatbot";
+                schemas = [./sql/create-player.sql];
+              }
+            ];
+            package = pkgs.postgresql_16.withPackages (p: [p.pgvector]);
           };
         };
       };
