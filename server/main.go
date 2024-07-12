@@ -7,14 +7,13 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
 	"github.com/matthewdargan/nba-chatbot/internal/nba"
 	"github.com/ollama/ollama/api"
 )
@@ -32,11 +31,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	db, err := sql.Open("postgres", os.Getenv("DB_URL"))
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, os.Getenv("DB_URL"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer conn.Close(ctx)
 	http.HandleFunc("/player-per-game", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
@@ -51,7 +51,7 @@ func main() {
 			http.Error(w, "Missing question", http.StatusBadRequest)
 			return
 		}
-		p, err := nba.NearestPlayer(client, db, req.Question)
+		p, err := nba.NearestPlayer(ctx, client, conn, req.Question)
 		if err != nil {
 			http.Error(w, "Error finding nearest player", http.StatusInternalServerError)
 		}
@@ -64,7 +64,7 @@ func main() {
 			Stream: &stream,
 		}
 		var resp playerPerGameResponse
-		if err := client.Generate(context.Background(), genReq, func(r api.GenerateResponse) error {
+		if err := client.Generate(ctx, genReq, func(r api.GenerateResponse) error {
 			resp.Response = r.Response
 			return nil
 		}); err != nil {

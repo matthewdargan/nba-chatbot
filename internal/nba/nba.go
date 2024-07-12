@@ -7,13 +7,12 @@ package nba
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
 	"github.com/ollama/ollama/api"
 	"github.com/pgvector/pgvector-go"
 )
@@ -21,7 +20,7 @@ import (
 // A Player represents an NBA player.
 type Player struct {
 	tokens             string
-	Embedding          pgvector.Vector `pg:"type:vector(1024)"`
+	Embedding          pgvector.Vector
 	rank               int
 	name               string
 	position           string
@@ -175,9 +174,9 @@ func tokens(fields, row []string) (string, error) {
 const embeddingModel = "mxbai-embed-large"
 
 // GenerateEmbeddings generates player embeddings.
-func (p *Player) GenerateEmbeddings(c *api.Client) error {
+func (p *Player) GenerateEmbeddings(ctx context.Context, c *api.Client) error {
 	req := &api.EmbeddingRequest{Model: embeddingModel, Prompt: p.tokens}
-	resp, err := c.Embeddings(context.Background(), req)
+	resp, err := c.Embeddings(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -190,49 +189,45 @@ func (p *Player) GenerateEmbeddings(c *api.Client) error {
 }
 
 // InsertPlayers inserts players into a database.
-func InsertPlayers(db *sql.DB, ps []Player) error {
-	txn, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	stmt, err := txn.Prepare(pq.CopyIn(
-		"player_per_game", "embedding", "rank", "name", "position", "age", "team",
-		"games", "games_started", "minutes_played", "field_goals", "field_goal_attempts",
-		"field_goal_pct", "three_pointers", "three_point_attempts", "three_point_pct",
-		"two_pointers", "two_point_attempts", "two_point_pct", "effective_fg_pct",
-		"free_throws", "free_throw_attempts", "free_throw_pct", "offensive_rebounds",
-		"defensive_rebounds", "total_rebounds", "assists", "steals", "blocks",
-		"turnovers", "personal_fouls", "points",
-	))
-	if err != nil {
-		return err
-	}
+func InsertPlayers(ctx context.Context, conn *pgx.Conn, ps []Player) error {
+	const q = `
+        INSERT INTO player_per_game (
+            embedding, rank, name, position, age, team, games,
+            games_started, minutes_played, field_goals, field_goal_attempts,
+            field_goal_pct, three_pointers, three_point_attempts, three_point_pct,
+            two_pointers, two_point_attempts, two_point_pct, effective_fg_pct,
+            free_throws, free_throw_attempts, free_throw_pct, offensive_rebounds,
+            defensive_rebounds, total_rebounds, assists, steals, blocks,
+            turnovers, personal_fouls, points
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+            $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
+        )`
+	b := &pgx.Batch{}
 	for _, p := range ps {
-		if _, err = stmt.Exec(
-			p.Embedding, p.rank, p.name, p.position, p.age, p.team, p.games, p.gamesStarted,
-			p.minutesPlayed, p.fieldGoals, p.fieldGoalAttempts, p.fieldGoalPct,
-			p.threePointers, p.threePointAttempts, p.threePointPct, p.twoPointers,
-			p.twoPointAttempts, p.twoPointPct, p.effectiveFGPct, p.freeThrows,
-			p.freeThrowAttempts, p.freeThrowPct, p.offensiveRebounds, p.defensiveRebounds,
-			p.totalRebounds, p.assists, p.steals, p.blocks, p.turnovers,
-			p.personalFouls, p.points,
-		); err != nil {
+		b.Queue(
+			q, p.Embedding, p.rank, p.name, p.position, p.age, p.team, p.games,
+			p.gamesStarted, p.minutesPlayed, p.fieldGoals, p.fieldGoalAttempts,
+			p.fieldGoalPct, p.threePointers, p.threePointAttempts, p.threePointPct,
+			p.twoPointers, p.twoPointAttempts, p.twoPointPct, p.effectiveFGPct,
+			p.freeThrows, p.freeThrowAttempts, p.freeThrowPct, p.offensiveRebounds,
+			p.defensiveRebounds, p.totalRebounds, p.assists, p.steals, p.blocks,
+			p.turnovers, p.personalFouls, p.points,
+		)
+	}
+	br := conn.SendBatch(ctx, b)
+	for range b.Len() {
+		if _, err := br.Exec(); err != nil {
 			return err
 		}
 	}
-	if _, err = stmt.Exec(); err != nil {
-		return err
-	}
-	if err = stmt.Close(); err != nil {
-		return err
-	}
-	return txn.Commit()
+	return br.Close()
 }
 
 // NearestPlayer returns the player whose embedding is closest to the given question.
-func NearestPlayer(c *api.Client, db *sql.DB, question string) (Player, error) {
+func NearestPlayer(ctx context.Context, c *api.Client, conn *pgx.Conn, question string) (Player, error) {
 	req := &api.EmbeddingRequest{Model: embeddingModel, Prompt: question}
-	resp, err := c.Embeddings(context.Background(), req)
+	resp, err := c.Embeddings(ctx, req)
 	if err != nil {
 		return Player{}, err
 	}
@@ -251,9 +246,8 @@ func NearestPlayer(c *api.Client, db *sql.DB, question string) (Player, error) {
             assists, steals, blocks, turnovers, personal_fouls, points
         FROM player_per_game
         ORDER BY embedding <-> $1
-        LIMIT 1
-    `
-	if err := db.QueryRow(q, pgvector.NewVector(eb)).Scan(
+        LIMIT 1`
+	if err := conn.QueryRow(ctx, q, pgvector.NewVector(eb)).Scan(
 		&p.rank, &p.name, &p.position, &p.age, &p.team, &p.games, &p.gamesStarted,
 		&p.minutesPlayed, &p.fieldGoals, &p.fieldGoalAttempts, &p.fieldGoalPct,
 		&p.threePointers, &p.threePointAttempts, &p.threePointPct, &p.twoPointers,

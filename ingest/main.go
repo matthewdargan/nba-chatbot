@@ -6,11 +6,12 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"encoding/csv"
 	"log"
 	"os"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/matthewdargan/nba-chatbot/internal/nba"
 	"github.com/ollama/ollama/api"
 )
@@ -39,17 +40,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	db, err := sql.Open("postgres", os.Getenv("DB_URL"))
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, os.Getenv("DB_URL"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer conn.Close(ctx)
 	for i := range ps {
-		if err = ps[i].GenerateEmbeddings(client); err != nil {
+		if err = ps[i].GenerateEmbeddings(ctx, client); err != nil {
 			log.Fatalf("failed to generate embeddings: %v", err)
 		}
 	}
-	if err = nba.InsertPlayers(db, ps); err != nil {
+	if err = nba.InsertPlayers(ctx, conn, ps); err != nil {
 		log.Fatalf("failed to insert players: %v", err)
 	}
 }

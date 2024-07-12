@@ -11,8 +11,7 @@ linters:
 linters-settings:
   errcheck:
     exclude-functions:
-      - (*database/sql.DB).Close
-      - (*database/sql.Rows).Close
+      - (*github.com/jackc/pgx/v5.Conn).Close
       - (net/http.ResponseWriter).Write
       - (*os.File).Close
   govet:
