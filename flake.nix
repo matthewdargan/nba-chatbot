@@ -30,6 +30,7 @@
           packages = [
             inputs'.nix-go.packages.go
             inputs'.nix-go.packages.golangci-lint
+            pkgs.ollama
             pkgs.pgcli
           ];
           shellHook = "${config.pre-commit.installationScript}";
@@ -67,15 +68,23 @@
         };
         process-compose."services" = {
           imports = [inputs.services-flake.processComposeModules.default];
-          services.postgres."pg1" = {
-            enable = true;
-            initialDatabases = [
-              {
-                name = "chatbot";
-                schemas = [./sql/create-player.sql];
-              }
-            ];
-            package = pkgs.postgresql_16.withPackages (p: [p.pgvector]);
+          services = {
+            ollama."ol1" = {
+              enable = true;
+              acceleration = "rocm";
+              environment."HSA_OVERRIDE_GFX_VERSION" = "11.0.0";
+              models = ["llama3:8b" "mxbai-embed-large"];
+            };
+            postgres."pg1" = {
+              enable = true;
+              initialDatabases = [
+                {
+                  name = "chatbot";
+                  schemas = [./sql/create-player.sql];
+                }
+              ];
+              package = pkgs.postgresql_16.withPackages (p: [p.pgvector]);
+            };
           };
         };
       };
