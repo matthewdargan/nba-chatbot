@@ -190,23 +190,22 @@ func (p *Player) GenerateEmbeddings(ctx context.Context, c *api.Client) error {
 
 // InsertPlayers inserts players into a database.
 func InsertPlayers(ctx context.Context, conn *pgx.Conn, ps []Player) error {
-	const q = `
-        INSERT INTO player_per_game (
-            embedding, rank, name, position, age, team, games,
-            games_started, minutes_played, field_goals, field_goal_attempts,
-            field_goal_pct, three_pointers, three_point_attempts, three_point_pct,
-            two_pointers, two_point_attempts, two_point_pct, effective_fg_pct,
-            free_throws, free_throw_attempts, free_throw_pct, offensive_rebounds,
-            defensive_rebounds, total_rebounds, assists, steals, blocks,
-            turnovers, personal_fouls, points
-        ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-            $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
-        )`
 	b := &pgx.Batch{}
 	for _, p := range ps {
 		b.Queue(
-			q, p.Embedding, p.rank, p.name, p.position, p.age, p.team, p.games,
+			`
+INSERT INTO player_per_game (
+    embedding, rank, name, position, age, team, games, games_started,
+    minutes_played, field_goals, field_goal_attempts, field_goal_pct,
+    three_pointers, three_point_attempts, three_point_pct, two_pointers,
+    two_point_attempts, two_point_pct, effective_fg_pct, free_throws,
+    free_throw_attempts, free_throw_pct, offensive_rebounds, defensive_rebounds,
+    total_rebounds, assists, steals, blocks, turnovers, personal_fouls, points
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+    $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
+)`,
+			p.Embedding, p.rank, p.name, p.position, p.age, p.team, p.games,
 			p.gamesStarted, p.minutesPlayed, p.fieldGoals, p.fieldGoalAttempts,
 			p.fieldGoalPct, p.threePointers, p.threePointAttempts, p.threePointPct,
 			p.twoPointers, p.twoPointAttempts, p.twoPointPct, p.effectiveFGPct,
@@ -236,18 +235,17 @@ func NearestPlayer(ctx context.Context, c *api.Client, conn *pgx.Conn, question 
 		eb[i] = float32(v)
 	}
 	var p Player
-	const q = `
-        SELECT
-            rank, name, position, age, team, games, games_started, minutes_played,
-            field_goals, field_goal_attempts, field_goal_pct, three_pointers,
-            three_point_attempts, three_point_pct, two_pointers, two_point_attempts,
-            two_point_pct, effective_fg_pct, free_throws, free_throw_attempts,
-            free_throw_pct, offensive_rebounds, defensive_rebounds, total_rebounds,
-            assists, steals, blocks, turnovers, personal_fouls, points
-        FROM player_per_game
-        ORDER BY embedding <-> $1
-        LIMIT 1`
-	if err := conn.QueryRow(ctx, q, pgvector.NewVector(eb)).Scan(
+	if err := conn.QueryRow(ctx, `
+SELECT
+    rank, name, position, age, team, games, games_started, minutes_played,
+    field_goals, field_goal_attempts, field_goal_pct, three_pointers,
+    three_point_attempts, three_point_pct, two_pointers, two_point_attempts,
+    two_point_pct, effective_fg_pct, free_throws, free_throw_attempts,
+    free_throw_pct, offensive_rebounds, defensive_rebounds, total_rebounds,
+    assists, steals, blocks, turnovers, personal_fouls, points
+FROM player_per_game
+ORDER BY embedding <-> $1
+LIMIT 1`, pgvector.NewVector(eb)).Scan(
 		&p.rank, &p.name, &p.position, &p.age, &p.team, &p.games, &p.gamesStarted,
 		&p.minutesPlayed, &p.fieldGoals, &p.fieldGoalAttempts, &p.fieldGoalPct,
 		&p.threePointers, &p.threePointAttempts, &p.threePointPct, &p.twoPointers,
