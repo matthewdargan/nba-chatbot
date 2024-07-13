@@ -18,10 +18,6 @@ import (
 	"github.com/ollama/ollama/api"
 )
 
-type playerPerGameRequest struct {
-	Question string `json:"question"`
-}
-
 type playerPerGameResponse struct {
 	Response string `json:"response"`
 }
@@ -38,24 +34,20 @@ func main() {
 	}
 	defer conn.Close(ctx)
 	http.HandleFunc("/player-per-game", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
+		if r.Method != http.MethodGet {
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 			return
 		}
-		var req playerPerGameRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			return
-		}
-		if req.Question == "" {
+		q := r.URL.Query().Get("question")
+		if q == "" {
 			http.Error(w, "Missing question", http.StatusBadRequest)
 			return
 		}
-		p, err := nba.NearestPlayer(ctx, client, conn, req.Question)
+		p, err := nba.NearestPlayer(ctx, client, conn, q)
 		if err != nil {
 			http.Error(w, "Error finding nearest player", http.StatusInternalServerError)
 		}
-		prompt := fmt.Sprintf("Using these Player Per Game statistics: %s. Respond to this prompt: %s", p, req.Question)
+		prompt := fmt.Sprintf("Using these Player Per Game statistics: %s. Respond to this prompt: %s", p, q)
 		log.Println(prompt)
 		stream := false
 		genReq := &api.GenerateRequest{
