@@ -3,11 +3,23 @@
 // license that can be found in the LICENSE file.
 
 // Ingest ingests NBA statistics and generates embeddings.
+//
+// Usage:
+//
+//	ingest file
+//
+// Example:
+//
+// Generate embeddings for statistics in `stats/player-per-game.csv`:
+//
+//	$ ingest 'stats/player-per-game.csv'
 package main
 
 import (
 	"context"
 	"encoding/csv"
+	"flag"
+	"fmt"
 	"log"
 	"os"
 
@@ -16,9 +28,20 @@ import (
 	"github.com/ollama/ollama/api"
 )
 
+func usage() {
+	fmt.Fprintf(os.Stderr, "usage: ingest file\n")
+	os.Exit(2)
+}
+
 func main() {
-	name := "stats/player-per-game.csv"
-	f, err := os.Open(name)
+	log.SetPrefix("ingest: ")
+	log.SetFlags(0)
+	flag.Usage = usage
+	flag.Parse()
+	if flag.NArg() != 1 {
+		usage()
+	}
+	f, err := os.Open(flag.Arg(0))
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -45,7 +45,7 @@
           pname = "nba-chatbot";
           src = ./.;
           vendorHash = "sha256-tAsNY+uT0rMoh1geIJymHWOjKmX63Ss5b0VPGgdYw8Y=";
-          version = "0.5.0";
+          version = "0.5.1";
         };
         pre-commit = {
           check.enable = false;
