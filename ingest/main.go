@@ -8,11 +8,19 @@
 //
 //	ingest file
 //
+// The [mxbai-embed-large] model generates embeddings for each row in the
+// provided CSV file. The PostgreSQL database stores these embeddings
+// along with all the statistical data. The PostgreSQL database requires the
+// [pgvector] extension to store embeddings.
+//
 // Example:
 //
-// Generate embeddings for statistics in `stats/player-per-game.csv`:
+// Generate and store embeddings for statistics in `stats/player-per-game.csv`:
 //
 //	$ ingest 'stats/player-per-game.csv'
+//
+// [mxbai-embed-large]: https://ollama.com/library/mxbai-embed-large
+// [pgvector]: https://github.com/pgvector/pgvector
 package main
 
 import (
