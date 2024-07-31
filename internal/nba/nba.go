@@ -7,6 +7,7 @@ package nba
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
@@ -31,17 +32,17 @@ type Player struct {
 	minutesPlayed      float64
 	fieldGoals         float64
 	fieldGoalAttempts  float64
-	fieldGoalPct       *float64
+	fieldGoalPct       sql.NullFloat64
 	threePointers      float64
 	threePointAttempts float64
-	threePointPct      *float64
+	threePointPct      sql.NullFloat64
 	twoPointers        float64
 	twoPointAttempts   float64
-	twoPointPct        *float64
-	effectiveFGPct     *float64
+	twoPointPct        sql.NullFloat64
+	effectiveFGPct     sql.NullFloat64
 	freeThrows         float64
 	freeThrowAttempts  float64
-	freeThrowPct       *float64
+	freeThrowPct       sql.NullFloat64
 	offensiveRebounds  float64
 	defensiveRebounds  float64
 	totalRebounds      float64
@@ -75,11 +76,11 @@ func (p Player) String() string {
 	)
 }
 
-func formatPercentage(p *float64) string {
-	if p == nil {
+func formatPercentage(p sql.NullFloat64) string {
+	if !p.Valid {
 		return "N/A"
 	}
-	return fmt.Sprintf("%.2f%%", *p*100)
+	return fmt.Sprintf("%.2f%%", p.Float64*100)
 }
 
 // NewPlayer returns a new [Player] from the given fields and row.
@@ -124,7 +125,7 @@ func NewPlayer(fields, row []string) (Player, error) {
 		28: &p.personalFouls,
 		29: &p.points,
 	}
-	optionalFloats := map[int]**float64{
+	nullableFloats := map[int]*sql.NullFloat64{
 		10: &p.fieldGoalPct,
 		13: &p.threePointPct,
 		16: &p.twoPointPct,
@@ -143,16 +144,16 @@ func NewPlayer(fields, row []string) (Player, error) {
 			return Player{}, fmt.Errorf("failed to parse float at index %d: %v", i, err)
 		}
 	}
-	for i, ptr := range optionalFloats {
+	for i, ptr := range nullableFloats {
 		if row[i] == "" {
 			continue
 		}
 		var v float64
 		v, err = strconv.ParseFloat(row[i], 64)
 		if err != nil {
-			return Player{}, fmt.Errorf("failed to parse optional float at index %d: %v", i, err)
+			return Player{}, fmt.Errorf("failed to parse nullable float at index %d: %v", i, err)
 		}
-		*ptr = &v
+		*ptr = sql.NullFloat64{Float64: v, Valid: true}
 	}
 	return p, nil
 }
