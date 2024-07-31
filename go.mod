@@ -4,8 +4,8 @@ go 1.22.5
 
 require (
 	github.com/jackc/pgx/v5 v5.6.0
-	github.com/ollama/ollama v0.2.2
-	github.com/pgvector/pgvector-go v0.2.0
+	github.com/ollama/ollama v0.3.1
+	github.com/pgvector/pgvector-go v0.2.1
 )
 
 require (
