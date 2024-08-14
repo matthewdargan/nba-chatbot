@@ -1,11 +1,11 @@
 module github.com/matthewdargan/nba-chatbot
 
-go 1.22.6
+go 1.23.0
 
 require (
 	github.com/jackc/pgx/v5 v5.6.0
-	github.com/ollama/ollama v0.3.4
-	github.com/pgvector/pgvector-go v0.2.1
+	github.com/ollama/ollama v0.3.6
+	github.com/pgvector/pgvector-go v0.2.2
 )
 
 require (
