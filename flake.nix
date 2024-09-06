@@ -44,8 +44,8 @@
           };
           pname = "nba-chatbot";
           src = ./.;
-          vendorHash = "sha256-ThZoq4st9yVq+mVWfXfagj6UZx/1XxVxguxne8UiuV8=";
-          version = "0.5.4";
+          vendorHash = "sha256-99WPOXeNbQK2ijur18ydYw1aViRwXdfGeP/qvzOHDW0=";
+          version = "0.5.5";
         };
         pre-commit = {
           check.enable = false;
